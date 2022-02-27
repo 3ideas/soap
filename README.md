@@ -5,7 +5,6 @@ First of all do not write SOAP services if you can avoid it! It is over.
 If you can not avoid it this package might help.
 
 
-
 ## Service
 
 ```go
