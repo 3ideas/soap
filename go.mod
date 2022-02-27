@@ -1,9 +1,10 @@
-module github.com/globusdigital/soap
+module github.com/3ideas/soap
 
 go 1.16
 
 require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/globusdigital/soap v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.7.0
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
+
+replace github.com/globusdigital/soap => github.com/3ideas/soap v1.3.2
