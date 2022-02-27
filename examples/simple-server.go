@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/globusdigital/soap"
+	"github.com/3ideas/soap"
 )
 
 // FooRequest a simple request
