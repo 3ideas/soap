@@ -7,10 +7,15 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 )
 
 // OperationHandlerFunc runs the actual business logic - request is whatever you constructed in RequestFactoryFunc
 type OperationHandlerFunc func(request interface{}, w http.ResponseWriter, httpRequest *http.Request) (response interface{}, err error)
+
+// OperationHandlerFuncWithType A modified operational handler function that also passes in the type of the the response
+// this enables generic response functions to be writen that can handle any response type
+type OperationHandlerFuncWithType func(request interface{}, w http.ResponseWriter, httpRequest *http.Request, responseStruc interface{}) (response interface{}, err error)
 
 // RequestFactoryFunc constructs a request object for OperationHandlerFunc
 type RequestFactoryFunc func() interface{}
@@ -18,8 +23,11 @@ type RequestFactoryFunc func() interface{}
 type dummyContent struct{}
 
 type operationHandler struct {
-	requestFactory RequestFactoryFunc
-	handler        OperationHandlerFunc
+	requestFactory  RequestFactoryFunc
+	handler         OperationHandlerFunc
+	handlerWithType OperationHandlerFuncWithType
+	requestStruct   interface{}
+	responseStruct  interface{}
 }
 
 type responseWriter struct {
@@ -92,6 +100,25 @@ func (s *Server) RegisterHandler(path string, action string, messageType string,
 	s.handlers[path][action][messageType] = &operationHandler{
 		handler:        operationHandlerFunc,
 		requestFactory: requestFactory,
+	}
+}
+
+// RegisterHandlerWithStructTypes Register a slightly differenct handler function, to enable auto generation of the Reqest struct from the type.
+// also the modiled
+// This function must not be called after the server has been started.
+func (s *Server) RegisterHandlerWithStructTypes(path string, action string, messageType string, requestFactory RequestFactoryFunc, operationHandlerFunc OperationHandlerFuncWithType, reqStruct interface{}, respStruct interface{}) {
+	if _, ok := s.handlers[path]; !ok {
+		s.handlers[path] = make(map[string]map[string]*operationHandler)
+	}
+
+	if _, ok := s.handlers[path][action]; !ok {
+		s.handlers[path][action] = make(map[string]*operationHandler)
+	}
+	s.handlers[path][action][messageType] = &operationHandler{
+		handlerWithType: operationHandlerFunc,
+		requestFactory:  requestFactory,
+		requestStruct:   reqStruct,
+		responseStruct:  respStruct,
 	}
 }
 
@@ -181,7 +208,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.handleError(fmt.Errorf("no action handler for content type: %q", t), w)
 			return
 		}
-		request := actionHandler.requestFactory()
+		var request interface{}
+		if actionHandler.requestFactory != nil {
+			request = actionHandler.requestFactory()
+		} else {
+			request = reflect.New(reflect.TypeOf(actionHandler.requestStruct)).Interface()
+
+		}
+
 		envelope := &Envelope{
 			Header: Header{},
 			Body: Body{
@@ -195,7 +229,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		s.log("request", s.jsonDump(envelope))
 
-		response, err := actionHandler.handler(request, w, r)
+		var response interface{}
+		if actionHandler.handlerWithType != nil {
+			response, err = actionHandler.handlerWithType(request, w, r, actionHandler.responseStruct)
+		} else {
+			response, err = actionHandler.handler(request, w, r)
+		}
+
 		if err != nil {
 			s.log("action handler threw up")
 			s.handleError(err, w)
