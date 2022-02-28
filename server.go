@@ -13,9 +13,9 @@ import (
 // OperationHandlerFunc runs the actual business logic - request is whatever you constructed in RequestFactoryFunc
 type OperationHandlerFunc func(request interface{}, w http.ResponseWriter, httpRequest *http.Request) (response interface{}, err error)
 
-// OperationHandlerFuncWithType A modified operational handler function that also passes in the type of the the response
-// this enables generic response functions to be writen that can handle any response type
-type OperationHandlerFuncWithType func(request interface{}, w http.ResponseWriter, httpRequest *http.Request, responseStruc interface{}) (response interface{}, err error)
+// OperationHandlerFuncWithInfo A modified operational handler function that also passes in an optional information field that can be used to pass in extra information about the request.
+// Its type is upto the handler to define.
+type OperationHandlerFuncWithInfo func(request interface{}, w http.ResponseWriter, httpRequest *http.Request, handlerInfo interface{}) (response interface{}, err error)
 
 // RequestFactoryFunc constructs a request object for OperationHandlerFunc
 type RequestFactoryFunc func() interface{}
@@ -25,9 +25,9 @@ type dummyContent struct{}
 type operationHandler struct {
 	requestFactory  RequestFactoryFunc
 	handler         OperationHandlerFunc
-	handlerWithType OperationHandlerFuncWithType
+	handlerWithInfo OperationHandlerFuncWithInfo
 	requestStruct   interface{}
-	responseStruct  interface{}
+	handlerInfo     interface{}
 }
 
 type responseWriter struct {
@@ -103,10 +103,10 @@ func (s *Server) RegisterHandler(path string, action string, messageType string,
 	}
 }
 
-// RegisterHandlerWithStructTypes Register a slightly differenct handler function, to enable auto generation of the Reqest struct from the type.
+// RegisterHandlerWithInfo Register a slightly differenct handler function, to enable auto generation of the Reqest struct from the type.
 // also the modiled
 // This function must not be called after the server has been started.
-func (s *Server) RegisterHandlerWithStructTypes(path string, action string, messageType string, requestFactory RequestFactoryFunc, operationHandlerFunc OperationHandlerFuncWithType, reqStruct interface{}, respStruct interface{}) {
+func (s *Server) RegisterHandlerWithInfo(path string, action string, messageType string, requestFactory RequestFactoryFunc, operationHandlerFunc OperationHandlerFuncWithInfo, reqStruct interface{}, handlerInfo interface{}) {
 	if _, ok := s.handlers[path]; !ok {
 		s.handlers[path] = make(map[string]map[string]*operationHandler)
 	}
@@ -115,10 +115,10 @@ func (s *Server) RegisterHandlerWithStructTypes(path string, action string, mess
 		s.handlers[path][action] = make(map[string]*operationHandler)
 	}
 	s.handlers[path][action][messageType] = &operationHandler{
-		handlerWithType: operationHandlerFunc,
+		handlerWithInfo: operationHandlerFunc,
 		requestFactory:  requestFactory,
 		requestStruct:   reqStruct,
-		responseStruct:  respStruct,
+		handlerInfo:     handlerInfo,
 	}
 }
 
@@ -230,8 +230,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.log("request", s.jsonDump(envelope))
 
 		var response interface{}
-		if actionHandler.handlerWithType != nil {
-			response, err = actionHandler.handlerWithType(request, w, r, actionHandler.responseStruct)
+		if actionHandler.handlerWithInfo != nil {
+			response, err = actionHandler.handlerWithInfo(request, w, r, actionHandler.handlerInfo)
 		} else {
 			response, err = actionHandler.handler(request, w, r)
 		}

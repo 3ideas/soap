@@ -20,10 +20,16 @@ type Foo1Response struct {
 	Bar string
 }
 
-func myHandlerForGenericResponses(request interface{}, w http.ResponseWriter, httpRequest *http.Request, responseStruc interface{}) (response interface{}, err error) {
+// Any type we want to pass in to the resonse handler
+type FooResponseInfo struct {
+	Info string
+}
+
+func myHandlerForResponses(request interface{}, w http.ResponseWriter, httpRequest *http.Request, info interface{}) (response interface{}, err error) {
+	myInfo := info.(*FooResponseInfo)
 	fooRequest := request.(*Foo1Request)
 	fooResponse := &Foo1Response{
-		Bar: "Hello \"" + fooRequest.Foo + "\"",
+		Bar: "Hello \"" + myInfo.Info + fooRequest.Foo + "\"",
 	}
 	response = fooResponse
 	return
@@ -51,7 +57,7 @@ func RunServer() {
 			return
 		},
 	)
-	soapServer.RegisterHandlerWithStructTypes("/pathTo", "operationFoo2", "foo2Request", nil, myHandlerForGenericResponses, Foo1Response{}, Foo1Response{})
+	soapServer.RegisterHandlerWithInfo("/pathTo", "operationFoo2", "foo2Request", nil, myHandlerForResponses, Foo1Response{}, &FooResponseInfo{Info: "some info"})
 	err := http.ListenAndServe(":8080", soapServer)
 	fmt.Println("exiting with error", err)
 }

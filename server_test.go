@@ -87,10 +87,10 @@ func TestServer_ServeHTTP(t *testing.T) {
 	})
 }
 
-func TestServer_ServeHTTP_default_requestStruct(t *testing.T) {
+func TestServer_ServeHTTP_RegisterHandlerWithInfo(t *testing.T) {
 	soapSrv := NewServer()
 	soapSrv.UseSoap11() // just for testing
-	soapSrv.RegisterHandlerWithStructTypes(
+	soapSrv.RegisterHandlerWithInfo(
 		"/pathTo",
 		"testPostAction",
 		"fooRequest",
