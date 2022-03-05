@@ -1,1 +1,3 @@
 vendor
+examples/server/simple-server_example
+examples/client/client_example

@@ -87,18 +87,18 @@ func TestClient_Call(t *testing.T) {
 				return &http.Response{
 					StatusCode: 200,
 					Body: ioutil.NopCloser(strings.NewReader(`<?xml version="1.0" encoding="utf-8"?>
-<seife12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<seife12:envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
   xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <seife:Body></seife:Body>
-</seife:Envelope>`)),
+</seife:envelope>`)),
 				}, nil
 			})
 			req := FooRequest{}
 			var resp FooResponse
 			httpResp, err := c.Call(context.Background(), "MySOAPAction", &req, &resp)
 			assert.Nil(t, httpResp)
-			assert.EqualError(t, err, "this is not a 1.1 SOAP-Message: \"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?>\\n<seife12:Envelope xmlns:xsi=\\\"http://www.w3.org/2001/XMLSchema-instance\\\"\\n  xmlns:xsd=\\\"http://www.w3.org/2001/XMLSchema\\\" \\n  xmlns:soap12=\\\"http://www.w3.org/2003/05/soap-envelope\\\">\\n  <seife:Body></seife:Body>\\n</seife:Envelope>\"")
+			assert.EqualError(t, err, "this is not a 1.1 SOAP-Message: \"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?>\\n<seife12:envelope xmlns:xsi=\\\"http://www.w3.org/2001/XMLSchema-instance\\\"\\n  xmlns:xsd=\\\"http://www.w3.org/2001/XMLSchema\\\" \\n  xmlns:soap12=\\\"http://www.w3.org/2003/05/soap-envelope\\\">\\n  <seife:Body></seife:Body>\\n</seife:envelope>\"")
 		})
 	})
 	t.Run("with multipart", func(t *testing.T) {

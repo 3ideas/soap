@@ -200,7 +200,7 @@ func (c *Client) Call(ctx context.Context, soapAction string, request, response 
 				return nil, fmt.Errorf("this is not a 1.2 SOAP-Message: %q", string(rawBody))
 			}
 		default:
-			if !(bytes.Contains(rawBody, soapPrefixTagLC) || bytes.Contains(rawBody, soapPrefixTagUC)) {
+			if !bytes.Contains(rawBody, []byte(`Envelope`)) {
 				if c.Log != nil {
 					c.Log("This is not a 1.1 SOAP-Message", "log_trace_id", logTraceID, "response_bytes", rawBody)
 				}
