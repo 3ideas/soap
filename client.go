@@ -212,6 +212,7 @@ func (c *Client) Call(ctx context.Context, soapAction string, request, response 
 	// We have an empty body or a SOAP body
 	if c.Log != nil {
 		c.Log("response raw body", "log_trace_id", logTraceID, "response_bytes", rawBody)
+		c.Log("response string", string(rawBody))
 	}
 
 	// Our structs for Envelope, Header, Body and Fault are tagged with namespace
