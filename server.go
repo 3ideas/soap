@@ -59,6 +59,7 @@ type Server struct {
 	Marshaller  XMLMarshaller
 	ContentType string
 	SoapVersion string
+	VerboseLog  bool
 }
 
 // NewServer construct a new SOAP server
@@ -68,6 +69,7 @@ func NewServer() *Server {
 		Marshaller:  defaultMarshaller{},
 		ContentType: SoapContentType11,
 		SoapVersion: SoapVersion11,
+		VerboseLog:  false,
 	}
 }
 
@@ -179,6 +181,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.handleError(fmt.Errorf("could not read POST:: %s", err), w)
 			return
 		}
+		if s.VerboseLog {
+			s.log("request body:", string(soapRequestBytes))
+		}
 		pathHandlers, ok := s.handlers[r.URL.Path]
 		if !ok {
 			s.handleError(fmt.Errorf("unknown path %q", r.URL.Path), w)
@@ -227,7 +232,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.handleError(fmt.Errorf("could not unmarshal request:: %s", err), w)
 			return
 		}
-		s.log("request", s.jsonDump(envelope))
+		s.log("request:", s.jsonDump(envelope))
 
 		var response interface{}
 		if actionHandler.handlerWithInfo != nil {
