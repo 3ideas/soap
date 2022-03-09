@@ -38,7 +38,14 @@ func myHandlerForResponses(request interface{}, w http.ResponseWriter, httpReque
 // RunServer run a little demo server
 func RunServer() {
 	soapServer := soap.NewServer()
-	soapServer.Log = log.Println
+	soapServer.Log = func(msg string, keyString_ValueInterface ...interface{}) {
+		keyString_ValueInterface = append(keyString_ValueInterface, msg)
+		var values []interface{}
+		values = append(values, "SOAP Server: ")
+		values = append(values, keyString_ValueInterface...)
+		log.Println(values...)
+	}
+	soapServer.LogLevel = 2
 	soapServer.RegisterHandler(
 		"/pathTo",
 		"operationFoo", // SOAPAction

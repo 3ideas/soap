@@ -31,9 +31,16 @@ type operationHandler struct {
 }
 
 type responseWriter struct {
-	log           func(...interface{})
+	logFunc       func(msg string, keyString_ValueInterface ...interface{})
+	logLevel      int
 	w             http.ResponseWriter
 	outputStarted bool
+}
+
+func (w *responseWriter) log(level int, msg string, args ...interface{}) {
+	if w.logFunc != nil && level <= w.logLevel {
+		w.logFunc(msg, args...)
+	}
 }
 
 func (w *responseWriter) Header() http.Header {
@@ -42,9 +49,9 @@ func (w *responseWriter) Header() http.Header {
 
 func (w *responseWriter) Write(b []byte) (int, error) {
 	w.outputStarted = true
-	if w.log != nil {
-		w.log("writing response: ", string(b))
-	}
+
+	w.log(2, "Response writter", "writing response: ", string(b))
+
 	return w.w.Write(b)
 }
 
@@ -54,12 +61,13 @@ func (w *responseWriter) WriteHeader(code int) {
 
 // Server a SOAP server, which can be run standalone or used as a http.HandlerFunc
 type Server struct {
-	Log         func(...interface{}) // do nothing on nil or add your fmt.Print* or log.*
+	//Log         func(...interface{}) // do nothing on nil or add your fmt.Print* or log.*
+	Log         func(msg string, keyString_ValueInterface ...interface{})
 	handlers    map[string]map[string]map[string]*operationHandler
 	Marshaller  XMLMarshaller
 	ContentType string
 	SoapVersion string
-	VerboseLog  bool
+	LogLevel    int
 }
 
 // NewServer construct a new SOAP server
@@ -69,13 +77,13 @@ func NewServer() *Server {
 		Marshaller:  defaultMarshaller{},
 		ContentType: SoapContentType11,
 		SoapVersion: SoapVersion11,
-		VerboseLog:  false,
+		LogLevel:    0,
 	}
 }
 
-func (s *Server) log(args ...interface{}) {
-	if s.Log != nil {
-		s.Log(args...)
+func (s *Server) log(level int, msg string, args ...interface{}) {
+	if s.Log != nil && level <= s.LogLevel {
+		s.Log(msg, args...)
 	}
 }
 
@@ -126,7 +134,7 @@ func (s *Server) RegisterHandlerWithInfo(path string, action string, messageType
 
 func (s *Server) handleError(err error, w http.ResponseWriter) {
 	// has to write a soap fault
-	s.log("handling error:", err)
+	s.log(1, "error", "handling error:", err)
 	responseEnvelope := &Envelope{
 		Body: Body{
 			Content: &Fault{
@@ -161,10 +169,11 @@ func addSOAPHeader(w http.ResponseWriter, contentLength int, contentType string)
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	soapAction := r.Header.Get("SOAPAction")
-	s.log("ServeHTTP method:", r.Method, ", path:", r.URL.Path, ", SOAPAction", "\""+soapAction+"\"")
+	s.log(1, "Request", "ServeHTTP method:", r.Method, ", path:", r.URL.Path, ", SOAPAction", "\""+soapAction+"\"")
 	// we have a valid request time to call the handler
 	w = &responseWriter{
-		log:           s.Log,
+		logFunc:       s.Log,
+		logLevel:      s.LogLevel,
 		w:             w,
 		outputStarted: false,
 	}
@@ -181,16 +190,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.handleError(fmt.Errorf("could not read POST:: %s", err), w)
 			return
 		}
-		if s.VerboseLog {
-			s.log("request body:", string(soapRequestBytes))
-		}
+
+		s.log(3, "Request", "request body:", string(soapRequestBytes))
+
 		pathHandlers, ok := s.handlers[r.URL.Path]
 		if !ok {
+			s.log(1, "Request", "unknown path:", r.URL.Path)
 			s.handleError(fmt.Errorf("unknown path %q", r.URL.Path), w)
 			return
 		}
 		actionHandlers, ok := pathHandlers[soapAction]
 		if !ok {
+			s.log(1, "Request", "unknown action:", soapAction)
 			s.handleError(fmt.Errorf("unknown action %q", soapAction), w)
 			return
 		}
@@ -207,7 +218,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		t := probeEnvelope.Body.SOAPBodyContentType
-		s.log("found content type", t)
+		s.log(1, "Request", "found content type", t)
 		actionHandler, ok := actionHandlers[t]
 		if !ok {
 			s.handleError(fmt.Errorf("no action handler for content type: %q", t), w)
@@ -232,7 +243,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.handleError(fmt.Errorf("could not unmarshal request:: %s", err), w)
 			return
 		}
-		s.log("request:", s.jsonDump(envelope))
+		s.log(2, "Request", "envelope:", s.jsonDump(envelope))
 
 		var response interface{}
 		if actionHandler.handlerWithInfo != nil {
@@ -242,11 +253,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err != nil {
-			s.log("action handler threw up")
+			s.log(1, "Request", "action handler threw up", err.Error())
 			s.handleError(err, w)
 			return
 		}
-		s.log("result", s.jsonDump(response))
+		s.log(2, "Response", "msg", s.jsonDump(response))
 		if !w.(*responseWriter).outputStarted {
 			responseEnvelope := &Envelope{
 				Body: Body{
@@ -264,7 +275,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			addSOAPHeader(w, len(xmlBytes), s.ContentType)
 			w.Write(xmlBytes)
 		} else {
-			s.log("action handler sent its own output")
+			s.log(1, "Respose action handler sent its own output")
 		}
 
 	default:
