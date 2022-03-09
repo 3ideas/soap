@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"strings"
 	"time"
@@ -45,6 +47,7 @@ type BasicAuth struct {
 // Client generic SOAP client
 type Client struct {
 	Log             func(msg string, keyString_ValueInterface ...interface{}) // optional
+	LogLevel        int                                                       // optional
 	url             string
 	urlMasked       string
 	tls             bool
@@ -129,10 +132,19 @@ func (c *Client) Call(ctx context.Context, soapAction string, request, response 
 	var logTraceID string
 	if c.Log != nil {
 		logTraceID = randString(12)
-		c.Log("Request", "log_trace_id", logTraceID, "url", c.urlMasked, "request_bytes", string(xmlBytes))
+		c.Log("Request", "log_trace_id", logTraceID, "url", c.urlMasked)
+		if c.LogLevel > 2 {
+			res, err := httputil.DumpRequest(req, true)
+			if err != nil {
+				log.Fatal(err)
+			}
+			c.Log("Request", "log_trace_id", logTraceID, "Full msgs", string(res))
+		} else if c.LogLevel > 1 {
+			c.Log("Request", "log_trace_id", logTraceID, "request_body:\n", string(xmlBytes))
+		}
 		hdr := req.Header.Clone()
 		hdr.Set("Authorization", "removed")
-		c.Log("Header", "log_trace_id", logTraceID, "Header", hdr)
+		c.Log("Request Header", "log_trace_id", logTraceID, "Header", hdr)
 	}
 	httpResponse, err := c.HTTPClientDoFn(req)
 	if err != nil {
@@ -141,16 +153,17 @@ func (c *Client) Call(ctx context.Context, soapAction string, request, response 
 	defer httpResponse.Body.Close()
 
 	if c.Log != nil {
+
 		c.Log("Response header", "log_trace_id", logTraceID, "header", httpResponse.Header)
 	}
 	mediaType, params, err := mime.ParseMediaType(httpResponse.Header.Get("Content-Type"))
 	if err != nil {
 		if c.Log != nil {
-			c.Log("WARNING", "log_trace_id", logTraceID, "error", err)
+			c.Log("Response WARNING", "log_trace_id", logTraceID, "error", err)
 		}
 	}
 	if c.Log != nil {
-		c.Log("MIMETYPE", "log_trace_id", logTraceID, "mediaType", mediaType)
+		c.Log("Response MIMETYPE", "log_trace_id", logTraceID, "mediaType", mediaType)
 	}
 	var rawBody []byte
 	if strings.HasPrefix(mediaType, "multipart/") { // MULTIPART MESSAGE
@@ -212,7 +225,7 @@ func (c *Client) Call(ctx context.Context, soapAction string, request, response 
 	// We have an empty body or a SOAP body
 	if c.Log != nil {
 		c.Log("response raw body", "log_trace_id", logTraceID, "response_bytes", rawBody)
-		c.Log("response string", string(rawBody))
+		c.Log("response body", "log_trace_id", logTraceID, string(rawBody))
 	}
 
 	// Our structs for Envelope, Header, Body and Fault are tagged with namespace
@@ -230,6 +243,9 @@ func (c *Client) Call(ctx context.Context, soapAction string, request, response 
 		respEnvelope.Body = Body{Content: &dummyContent{}} // must be a pointer in dummyContent
 	}
 	if err := xml.Unmarshal(rawBody, respEnvelope); err != nil {
+		if c.Log != nil {
+			c.Log("response", "log_trace_id", logTraceID, "could not unmarshal", err.Error())
+		}
 		return nil, fmt.Errorf("soap/client.go Call(): COULD NOT UNMARSHAL: %w\n", err)
 	}
 
