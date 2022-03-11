@@ -258,6 +258,15 @@ func (c *Client) Call(ctx context.Context, soapAction string, request, response 
 		c.log(1, "Response", "log_trace_id", logTraceID, "SOAP FAULT", formatFaultXML(rawBody, 1))
 		return nil, fmt.Errorf("SOAP FAULT: %q", formatFaultXML(rawBody, 1))
 	}
+
+	c.log(1, "Response", "log_trace_id", logTraceID, "http status", httpResponse.Status)
+	if c.LogLevel >= 3 {
+		dump, err := httputil.DumpResponse(httpResponse, true)
+		if err != nil {
+			log.Fatal(err)
+			c.log(3, "Response", "log_trace_id", logTraceID, "raw respose", dump)
+		}
+	}
 	return httpResponse, nil
 }
 
