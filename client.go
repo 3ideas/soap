@@ -164,7 +164,8 @@ func (c *Client) Call(ctx context.Context, soapAction string, request, response 
 		if err != nil {
 			log.Fatal(err)
 		}
-		c.log(3, "Response", "log_trace_id", logTraceID, "raw respose", string(dump))
+		s := fmt.Sprintf("\n%s", dump)
+		c.log(3, "Response", "log_trace_id", logTraceID, "raw respose", s)
 	}
 
 	c.log(2, "Response header", "log_trace_id", logTraceID, "header", httpResponse.Header)
